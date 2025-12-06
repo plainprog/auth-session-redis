@@ -28,6 +28,32 @@ Provides endpoints for managing user sessions and authentication.
     - **`authorities`:** A comma-separated list of user authorities/roles.
 - **Usage:** This endpoint should be called by your app after credentials validation to log in the user and start the session.
 
+#### 3. Terminate Session
+
+- **URL:** `/api/session/terminate/{sessionId}`
+- **Method:** `DELETE`
+- **Description:** Terminates a session by its ID. This is an unprotected endpoint intended for backend service use.
+- **Path Parameter:** `sessionId` - The ID of the session to terminate.
+- **Returns:**
+    - `204 No Content` if session was successfully deleted
+    - `404 Not Found` if session doesn't exist
+    - `500 Internal Server Error` on error
+- **Usage:** Call this endpoint to explicitly terminate a user session (e.g., during logout or session cleanup).
+
+#### 4. Validate Sessions Batch
+
+- **URL:** `/api/session/validate-batch`
+- **Method:** `POST`
+- **Description:** Validates multiple sessions in a single request. This is an unprotected endpoint intended for backend service use.
+- **Request Body:** JSON object with `sessionIds` array:
+    ```json
+    {
+      "sessionIds": ["session-id-1", "session-id-2", "session-id-3"]
+    }
+    ```
+- **Returns:** Array of session data objects. Non-existent sessions will have `exists: false` with only the `sessionId` field populated.
+- **Usage:** Use this endpoint to efficiently validate multiple sessions in one request using Redis pipelining for optimal performance.
+
 ## How to use:
 
 1) Build the .jar file using command `mvn clean install` or your IDE. You should have a .jar file in the target directory.
