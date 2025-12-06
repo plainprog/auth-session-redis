@@ -12,6 +12,8 @@ import redis.clients.jedis.JedisPool;
 
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
+import org.springframework.session.Session;
+import org.springframework.session.SessionRepository;
 
 import java.security.Principal;
 import java.time.Instant;
@@ -25,6 +27,9 @@ public class SessionExplorerService {
 
     @Autowired
     JedisPool jedisPool;
+
+    @Autowired
+    SessionRepository<? extends Session> sessionRepository;
 
     private Map<byte[], byte[]> getRedisKey(String redisKey) {
         try (Jedis jedis = jedisPool.getResource()) {
@@ -83,6 +88,30 @@ public class SessionExplorerService {
         sessionData.setSessionId(sessionId);
         sessionData.setUser(basicUserInfoDTO);
         return sessionData;
+    }
+
+    /**
+     * Deletes a session by its ID, removing it from Spring Session and Redis.
+     *
+     * @param sessionId the session ID to delete
+     * @return true if session existed and was deleted, false if not found
+     */
+    public boolean deleteSession(String sessionId) {
+        try {
+            Session session = sessionRepository.findById(sessionId);
+
+            if (session == null) {
+                return false;
+            }
+
+            sessionRepository.deleteById(sessionId);
+            return true;
+
+        } catch (Exception e) {
+            System.err.println("Error deleting session " + sessionId + ": " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to delete session: " + sessionId, e);
+        }
     }
 
 }

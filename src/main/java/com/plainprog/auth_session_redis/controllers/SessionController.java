@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,5 +45,41 @@ public class SessionController {
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, SecurityContextHolder.getContext());
         session.setAttribute("data", data);
         return "Session initiated";
+    }
+
+    /**
+     * Terminates a session by ID. Unprotected endpoint for backend service use.
+     *
+     * @param sessionId the session ID to terminate
+     * @return 204 if deleted, 404 if not found, 500 on error
+     */
+    @DeleteMapping("/terminate/{sessionId}")
+    public ResponseEntity<?> terminateSession(@PathVariable String sessionId, HttpSession currentSession) {
+        try {
+            // Check if we're deleting the current request's session
+            boolean isDeletingCurrentSession = currentSession != null &&
+                                               sessionId.equals(currentSession.getId());
+
+            boolean deleted = sessionExplorerService.deleteSession(sessionId);
+
+            if (deleted) {
+                // If we deleted the current session, invalidate it to prevent Spring from trying to save it
+                if (isDeletingCurrentSession) {
+                    try {
+                        currentSession.invalidate();
+                    } catch (IllegalStateException e) {
+                        // Session already invalidated, ignore
+                    }
+                }
+                return ResponseEntity.noContent().build();
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Session not found: " + sessionId);
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Error terminating session: " + e.getMessage());
+        }
     }
 }

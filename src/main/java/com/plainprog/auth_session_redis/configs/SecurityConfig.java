@@ -18,6 +18,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable) // Updated way to disable CSRF
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/session/validate").authenticated()
+                        .requestMatchers("/api/session/terminate/**").permitAll()
                         .requestMatchers(request -> {
                         String remoteAddr = request.getRemoteAddr();
                         return remoteAddr.startsWith("10.")
