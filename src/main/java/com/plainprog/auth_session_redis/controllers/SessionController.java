@@ -1,6 +1,7 @@
 package com.plainprog.auth_session_redis.controllers;
 
 import com.plainprog.auth_session_redis.model.BatchSessionRequest;
+import com.plainprog.auth_session_redis.model.BatchSessionResponse;
 import com.plainprog.auth_session_redis.model.SessionData;
 import com.plainprog.auth_session_redis.service.SessionExplorerService;
 import jakarta.servlet.http.HttpSession;
@@ -90,17 +91,18 @@ public class SessionController {
      * sessionId populated with other fields null.
      *
      * @param request batch session request containing list of session IDs
-     * @return list of SessionData objects
+     * @return BatchSessionResponse containing list of SessionData objects
      */
     @PostMapping("/validate-batch")
-    public ResponseEntity<List<SessionData>> validateSessionsBatch(@RequestBody BatchSessionRequest request) {
+    public ResponseEntity<BatchSessionResponse> validateSessionsBatch(@RequestBody BatchSessionRequest request) {
         try {
             if (request == null || request.getSessionIds() == null || request.getSessionIds().isEmpty()) {
                 return ResponseEntity.badRequest().build();
             }
 
             List<SessionData> results = sessionExplorerService.getSessionDataBatch(request.getSessionIds());
-            return ResponseEntity.ok(results);
+            BatchSessionResponse response = new BatchSessionResponse(results);
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
