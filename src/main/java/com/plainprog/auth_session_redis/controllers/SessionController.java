@@ -1,5 +1,6 @@
 package com.plainprog.auth_session_redis.controllers;
 
+import com.plainprog.auth_session_redis.model.BatchSessionRequest;
 import com.plainprog.auth_session_redis.model.SessionData;
 import com.plainprog.auth_session_redis.service.SessionExplorerService;
 import jakarta.servlet.http.HttpSession;
@@ -80,6 +81,29 @@ public class SessionController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Error terminating session: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validates multiple sessions in a batch. Unprotected endpoint for backend service use.
+     * Returns session data for all requested IDs. Non-existent sessions will have only
+     * sessionId populated with other fields null.
+     *
+     * @param request batch session request containing list of session IDs
+     * @return list of SessionData objects
+     */
+    @PostMapping("/validate-batch")
+    public ResponseEntity<List<SessionData>> validateSessionsBatch(@RequestBody BatchSessionRequest request) {
+        try {
+            if (request == null || request.getSessionIds() == null || request.getSessionIds().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            List<SessionData> results = sessionExplorerService.getSessionDataBatch(request.getSessionIds());
+            return ResponseEntity.ok(results);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Pipeline;
 
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import org.springframework.session.SessionRepository;
 
 import java.security.Principal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,8 +42,20 @@ public class SessionExplorerService {
     public SessionData getSessionData(String sessionId) {
         String redisKey = "spring:session:sessions:" + sessionId;
         Map<byte[], byte[]> sessionDataByte = getRedisKey(redisKey);
+        return processSessionHash(sessionId, sessionDataByte);
+    }
+
+    /**
+     * Processes raw Redis hash data into SessionData object.
+     *
+     * @param sessionId the session ID
+     * @param sessionDataByte the raw Redis hash data
+     * @return SessionData object with populated fields
+     */
+    private SessionData processSessionHash(String sessionId, Map<byte[], byte[]> sessionDataByte) {
         BasicUserInfoDTO basicUserInfoDTO = new BasicUserInfoDTO();
         SessionData sessionData = new SessionData();
+
         for (Map.Entry<byte[], byte[]> entry : sessionDataByte.entrySet()) {
             String field = new String(entry.getKey());
             byte[] value = entry.getValue();
@@ -68,6 +82,15 @@ public class SessionExplorerService {
                     if (context instanceof SecurityContextImpl) {
                         Principal principal = ((SecurityContextImpl) context).getAuthentication();
                         basicUserInfoDTO.setUsername(principal.getName());
+
+                        // Extract authorities from session's auth, not caller's
+                        Authentication sessionAuth = ((SecurityContextImpl) context).getAuthentication();
+                        if (sessionAuth != null) {
+                            List<String> roles = sessionAuth.getAuthorities().stream()
+                                    .map(GrantedAuthority::getAuthority)
+                                    .toList();
+                            basicUserInfoDTO.setAuthorities(roles);
+                        }
                     }
                 } else if (field.equals("maxInactiveInterval")) {
                     Object maxInactiveInterval = serializer.deserialize(value);
@@ -80,13 +103,10 @@ public class SessionExplorerService {
                 e.printStackTrace();
             }
         }
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        List<String> roles = auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .toList();
-        basicUserInfoDTO.setAuthorities(roles);
+
         sessionData.setSessionId(sessionId);
         sessionData.setUser(basicUserInfoDTO);
+        sessionData.setExists(true);
         return sessionData;
     }
 
@@ -111,6 +131,57 @@ public class SessionExplorerService {
             System.err.println("Error deleting session " + sessionId + ": " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Failed to delete session: " + sessionId, e);
+        }
+    }
+
+    /**
+     * Retrieves session data for multiple sessions using Redis pipelining.
+     * Returns SessionData for all requested IDs. Non-existent sessions will have
+     * only sessionId populated, all other fields will be null.
+     *
+     * @param sessionIds list of session IDs to retrieve
+     * @return list of SessionData objects in the same order as input
+     */
+    public List<SessionData> getSessionDataBatch(List<String> sessionIds) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        try (Jedis jedis = jedisPool.getResource()) {
+            // Use pipelining to fetch all sessions in a single network round trip
+            Pipeline pipeline = jedis.pipelined();
+
+            for (String sessionId : sessionIds) {
+                String redisKey = "spring:session:sessions:" + sessionId;
+                pipeline.hgetAll(redisKey.getBytes());
+            }
+
+            List<Object> results = pipeline.syncAndReturnAll();
+            List<SessionData> sessionDataList = new ArrayList<>();
+
+            for (int i = 0; i < sessionIds.size(); i++) {
+                String sessionId = sessionIds.get(i);
+                Map<byte[], byte[]> sessionDataByte = (Map<byte[], byte[]>) results.get(i);
+
+                if (sessionDataByte == null || sessionDataByte.isEmpty()) {
+                    // Session doesn't exist - return SessionData with only ID
+                    SessionData emptySession = new SessionData();
+                    emptySession.setExists(false);
+                    emptySession.setSessionId(sessionId);
+                    emptySession.setUser(new BasicUserInfoDTO());
+                    sessionDataList.add(emptySession);
+                } else {
+                    // Process the session data
+                    sessionDataList.add(processSessionHash(sessionId, sessionDataByte));
+                }
+            }
+
+            return sessionDataList;
+
+        } catch (Exception e) {
+            System.err.println("Error retrieving batch session data: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to retrieve batch session data", e);
         }
     }
 

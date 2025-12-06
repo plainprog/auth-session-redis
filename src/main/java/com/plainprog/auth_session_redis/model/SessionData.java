@@ -11,6 +11,7 @@ public class SessionData {
     private Instant creationTime;
     private Instant lastAccessedTime;
     private Integer maxInactiveInterval;
+    private Boolean exists;
 
     public SessionData() {
     }
@@ -61,5 +62,13 @@ public class SessionData {
 
     public void setUser(BasicUserInfoDTO user) {
         this.user = user;
+    }
+
+    public Boolean getExists() {
+        return exists;
+    }
+
+    public void setExists(Boolean exists) {
+        this.exists = exists;
     }
 }

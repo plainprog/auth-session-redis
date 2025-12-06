@@ -19,6 +19,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/session/validate").authenticated()
                         .requestMatchers("/api/session/terminate/**").permitAll()
+                        .requestMatchers("/api/session/validate-batch").permitAll()
                         .requestMatchers(request -> {
                         String remoteAddr = request.getRemoteAddr();
                         return remoteAddr.startsWith("10.")
