@@ -26,6 +26,11 @@ This is a session authentication service that uses Redis for session storage. Ke
 - **Service:** `SessionExplorerService` for session data management
 - **Models:** `SessionData` and `BasicUserInfoDTO`
 
+### SessionExplorerService Methods
+- `getSessionData(String sessionId)` - Retrieves session data from Redis by session ID
+- `deleteSession(String sessionId)` - Deletes session from Spring Session repository and Redis
+- `getSessionDataBatch(List<String> sessionIds)` - Batch retrieves multiple sessions using Redis pipelining for performance
+
 ### Key Design Decisions
 - **Security:** Only allows requests from localhost (127.0.0.1, ::1) - modify `SecurityConfig.java:21-26` to change this
 - **Redis Integration:** Uses MessagePack serialization for efficient session storage
@@ -35,6 +40,8 @@ This is a session authentication service that uses Redis for session storage. Ke
 ### API Endpoints
 - `POST /api/session/validate` - Validates existing session (authenticated endpoint)
 - `POST /api/session/initiate` - Creates new session with user data and authorities
+- `DELETE /api/session/terminate/{sessionId}` - Terminates session by ID (unprotected backend endpoint)
+- `POST /api/session/validate-batch` - Validates multiple sessions in batch (unprotected backend endpoint)
 
 ### Configuration Notes
 - Application runs on port 5060 (configurable via `server.port`)
