@@ -51,28 +51,17 @@ public class SessionController {
 
     /**
      * Terminates a session by ID. Unprotected endpoint for backend service use.
+     * This endpoint is stateless and does not access the caller's session.
      *
      * @param sessionId the session ID to terminate
      * @return 204 if deleted, 404 if not found, 500 on error
      */
     @DeleteMapping("/terminate/{sessionId}")
-    public ResponseEntity<?> terminateSession(@PathVariable String sessionId, HttpSession currentSession) {
+    public ResponseEntity<?> terminateSession(@PathVariable String sessionId) {
         try {
-            // Check if we're deleting the current request's session
-            boolean isDeletingCurrentSession = currentSession != null &&
-                                               sessionId.equals(currentSession.getId());
-
             boolean deleted = sessionExplorerService.deleteSession(sessionId);
 
             if (deleted) {
-                // If we deleted the current session, invalidate it to prevent Spring from trying to save it
-                if (isDeletingCurrentSession) {
-                    try {
-                        currentSession.invalidate();
-                    } catch (IllegalStateException e) {
-                        // Session already invalidated, ignore
-                    }
-                }
                 return ResponseEntity.noContent().build();
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
